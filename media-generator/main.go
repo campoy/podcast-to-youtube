@@ -17,7 +17,7 @@ import (
 
 const (
 	projectID  = "podcast-to-youtube"
-	topicName  = "image-generation"
+	topicName  = "media-generation"
 	subsName   = "worker"
 	bucketName = "podcast-to-youtube"
 )
@@ -71,6 +71,7 @@ func processTask(ctx context.Context, number, title, mp3 string) error {
 		return fmt.Errorf("could not create slide.png: %v", err)
 	}
 	defer f.Close()
+	defer os.Remove("slide.png")
 
 	// create the background image for the video and writing to slide.png.
 	m, err := createImage(number, title)
@@ -93,6 +94,7 @@ func processTask(ctx context.Context, number, title, mp3 string) error {
 		return fmt.Errorf("could not create audio.mp3: %v", err)
 	}
 	defer f.Close()
+	defer os.Remove("audio.mp3")
 
 	if _, err := io.Copy(f, res.Body); err != nil {
 		return fmt.Errorf("could not write to audio.mp3: %v", err)
@@ -102,6 +104,7 @@ func processTask(ctx context.Context, number, title, mp3 string) error {
 	if err != nil {
 		return fmt.Errorf("could not create video: %v", err)
 	}
+	defer os.Remove(vid)
 
 	return upload(ctx, number, title, vid)
 }
