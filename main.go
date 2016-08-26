@@ -7,12 +7,14 @@ import (
 	"flag"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func main() {
 	var (
-		rssFeed = flag.String("rss", "http://feeds.feedburner.com/GcpPodcast?format=xml", "url for the RSS feed")
-		logo    = flag.String("logo", "logo.png", "path to the PNG logo image")
+		rssFeed   = flag.String("rss", "http://feeds.feedburner.com/GcpPodcast?format=xml", "url for the RSS feed")
+		logo      = flag.String("logo", "logo.png", "path to the PNG logo image")
+		titleTmpl = flag.String("title", "%s: GCPPodcast %d", "template used for the title")
 	)
 	flag.Parse()
 
@@ -42,9 +44,11 @@ func main() {
 		return
 	}
 
+	title := fmt.Sprintf(*titleTmpl, ep.Title, ep.Number)
 	desc := fmt.Sprintf("Original post: %s\n\n", ep.Link) + dropHTMLTags(ep.Desc)
+	tags := append(ep.Tags, "gcppodcast", "podcast")
 
-	if err := uploadToYouTube(ctx, ep.Number, ep.Title, desc, vid); err != nil {
+	if err := uploadToYouTube(ctx, title, desc, tags, vid); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -56,6 +60,7 @@ type episode struct {
 	Link   string
 	Desc   string
 	MP3    string
+	Tags   []string
 }
 
 func fetchEpisode(rss string, number int) (*episode, error) {
@@ -76,6 +81,7 @@ func fetchEpisode(rss string, number int) (*episode, error) {
 				MP3    struct {
 					URL string `xml:"url,attr"`
 				} `xml:"enclosure"`
+				Category []string `xml:"category"`
 			} `xml:"item"`
 		} `xml:"channel"`
 	}
@@ -92,6 +98,7 @@ func fetchEpisode(rss string, number int) (*episode, error) {
 				Link:   i.Link,
 				Desc:   i.Desc,
 				MP3:    i.MP3.URL,
+				Tags:   i.Category,
 			}, nil
 		}
 	}
@@ -114,5 +121,5 @@ func dropHTMLTags(s string) string {
 			fmt.Fprintf(&w, "%c", r)
 		}
 	}
-	return w.String()
+	return strings.Replace(w.String(), "\n", " ", -1)
 }

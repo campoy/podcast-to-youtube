@@ -2,21 +2,19 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
-	"gopkg.in/cheggaaa/pb.v1"
-
-	"golang.org/x/oauth2"
-
+	"golang.org/x/oauth2/google"
 	"google.golang.org/api/youtube/v3"
+	"gopkg.in/cheggaaa/pb.v1"
 )
 
-func uploadToYouTube(ctx context.Context, number int, title, desc, path string) error {
+func uploadToYouTube(ctx context.Context, title, desc string, tags []string, path string) error {
 	client, err := authedClient(ctx)
 	if err != nil {
 		return fmt.Errorf("could not authenticate: %v", err)
@@ -28,8 +26,9 @@ func uploadToYouTube(ctx context.Context, number int, title, desc, path string) 
 
 	upload := &youtube.Video{
 		Snippet: &youtube.VideoSnippet{
-			Title:       fmt.Sprintf("GCPPodcast #%d: %s", number, title),
-			Description: dropHTMLTags(desc),
+			Title:       title,
+			Description: desc,
+			Tags:        tags,
 		},
 		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
 	}
@@ -57,10 +56,16 @@ func uploadToYouTube(ctx context.Context, number int, title, desc, path string) 
 
 // authedClient performs an offline OAuth flow.
 func authedClient(ctx context.Context) (*http.Client, error) {
-	cfg, err := oauthConfig()
+	const path = "client_secrets.json"
+	b, err := ioutil.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not open %s: %v", path, err)
 	}
+	cfg, err := google.ConfigFromJSON(b, youtube.YoutubeUploadScope)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse config: %v", err)
+	}
+
 	url := cfg.AuthCodeURL("")
 	fmt.Printf("Go here: \n\t%s\n", url)
 	fmt.Printf("Then enter the code: ")
@@ -71,20 +76,6 @@ func authedClient(ctx context.Context) (*http.Client, error) {
 		return nil, err
 	}
 	return cfg.Client(ctx, tok), nil
-}
-
-func oauthConfig() (*oauth2.Config, error) {
-	const path = "client_secret.json"
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not open %s: %v", path, err)
-	}
-	defer f.Close()
-	var cfg oauth2.Config
-	if err := json.NewDecoder(f).Decode(&cfg); err != nil {
-		return nil, fmt.Errorf("could not parse %s: %v", path, err)
-	}
-	return &cfg, nil
 }
 
 func progressBarReader(f *os.File) (io.Reader, error) {
