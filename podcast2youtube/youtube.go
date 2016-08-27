@@ -1,4 +1,4 @@
-package main
+package podcast2youtube
 
 import (
 	"context"
@@ -14,7 +14,9 @@ import (
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
-func uploadToYouTube(ctx context.Context, title, desc string, tags []string, path string) error {
+// UploadToYouTube uploads the video in the given path to YouTube with the given
+// details. This will prompt an offline authentication flow.
+func UploadToYouTube(ctx context.Context, title, desc string, tags []string, path string) error {
 	client, err := authedClient(ctx)
 	if err != nil {
 		return fmt.Errorf("could not authenticate: %v", err)
@@ -37,7 +39,7 @@ func uploadToYouTube(ctx context.Context, title, desc string, tags []string, pat
 	if err != nil {
 		return fmt.Errorf("could not open %v: %v", path, err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	fmt.Println("uploading video to YouTube")
 	r, err := progressBarReader(f)
