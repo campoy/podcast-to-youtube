@@ -18,7 +18,9 @@ import (
 	"image"
 	"image/color"
 	"image/draw"
+	"image/png"
 	"io/ioutil"
+	"os"
 	"strconv"
 
 	"github.com/golang/freetype/truetype"
@@ -26,32 +28,48 @@ import (
 	"golang.org/x/image/math/fixed"
 )
 
-// CreateImage creates a new image containing the given logo and text.
-func CreateImage(logo image.Image, text, fgHex, bgHex string, width, height int) (image.Image, error) {
-	bg, err := hexToColor(bgHex)
+// Image contains all the parameters that describe an image.
+// They are all required for image creation.
+type Image struct {
+	Logo       string
+	Text       string
+	Font       string
+	Foreground string
+	Background string
+	Width      int
+	Height     int
+}
+
+// CreateIn creates an image according to the specifications and stores it in dest.
+func (img *Image) CreateIn(dest string) error {
+	bg, err := hexToColor(img.Background)
 	if err != nil {
-		return nil, fmt.Errorf("invalid background color %q: %v", bgHex, err)
+		return fmt.Errorf("invalid background color %q: %v", img.Background, err)
 	}
 
 	// create a new image with the given background color
-	m := image.NewRGBA(image.Rect(0, 0, width, height))
+	m := image.NewRGBA(image.Rect(0, 0, img.Width, img.Height))
 	draw.Draw(m, m.Bounds(), image.NewUniform(bg), image.Point{}, draw.Src)
 
+	logo, err := loadPNG(img.Logo)
+	if err != nil {
+		return fmt.Errorf("could not open %s: %v", img.Logo, err)
+	}
 	pos := image.Point{(m.Bounds().Max.X - logo.Bounds().Max.X) / 2, m.Bounds().Max.Y / 3}
 	draw.Draw(m, m.Bounds().Add(pos), logo, image.Point{}, draw.Over)
 
 	// load a font
-	f, err := loadFont("Roboto-Light.ttf")
+	f, err := loadFont(img.Font)
 	if err != nil {
-		return nil, fmt.Errorf("could not load font: %v", err)
+		return fmt.Errorf("could not load font: %v", err)
 	}
 
-	fg, err := hexToColor(fgHex)
+	fg, err := hexToColor(img.Foreground)
 	if err != nil {
-		return nil, fmt.Errorf("invalid foreground color %q: %v", fgHex, err)
+		return fmt.Errorf("invalid foreground color %q: %v", img.Foreground, err)
 	}
 
-	face, dot := fitFontSize(f, m.Bounds().Max.X, text)
+	face, dot := fitFontSize(f, m.Bounds().Max.X, img.Text)
 	// and use it to write some text
 	d := &font.Drawer{
 		Dst:  m,
@@ -59,8 +77,12 @@ func CreateImage(logo image.Image, text, fgHex, bgHex string, width, height int)
 		Face: face,
 		Dot:  dot,
 	}
-	d.DrawString(text)
-	return m, nil
+	d.DrawString(img.Text)
+
+	if err := writePNG(dest, m); err != nil {
+		return fmt.Errorf("could not write to %s: %v", dest, err)
+	}
+	return nil
 }
 
 // hexToColor parses a hexadecimal color and returns it as an RGBA color.
@@ -78,7 +100,6 @@ func hexToColor(s string) (*color.RGBA, error) {
 	return &color.RGBA{r, g, b, 255}, nil
 }
 
-// loadFont loads a truetype font in the given path.
 func loadFont(path string) (*truetype.Font, error) {
 	b, err := ioutil.ReadFile(path)
 	if err != nil {
@@ -90,6 +111,41 @@ func loadFont(path string) (*truetype.Font, error) {
 		return nil, fmt.Errorf("could not parse font: %v", err)
 	}
 	return f, nil
+}
+
+func loadPNG(path string) (m image.Image, err error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not open %s: %v", path, err)
+	}
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("could not close %s: %v", path, err)
+		}
+	}()
+
+	m, err = png.Decode(f)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode %s: %v", path, err)
+	}
+	return m, nil
+}
+
+func writePNG(path string, m image.Image) error {
+	f, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("could not create %s: %v", path, err)
+	}
+	defer func() {
+		if cerr := f.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("could not close %s: %v", path, err)
+		}
+	}()
+
+	if err := png.Encode(f, m); err != nil {
+		return fmt.Errorf("could not encode to %s: %v", path, err)
+	}
+	return nil
 }
 
 // fitFontSize finds the font size at which the given text fits 80% of the

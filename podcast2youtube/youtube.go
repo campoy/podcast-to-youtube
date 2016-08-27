@@ -14,26 +14,19 @@
 package podcast2youtube
 
 import (
-	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
-	"golang.org/x/oauth2/google"
 	"google.golang.org/api/youtube/v3"
 	"gopkg.in/cheggaaa/pb.v1"
 )
 
 // UploadToYouTube uploads the video in the given path to YouTube with the given
 // details. This will prompt an offline authentication flow.
-func UploadToYouTube(ctx context.Context, title, desc string, tags []string, path string) error {
-	client, err := authedClient(ctx)
-	if err != nil {
-		return fmt.Errorf("could not authenticate: %v", err)
-	}
+func UploadToYouTube(client *http.Client, title, desc string, tags []string, path string) error {
 	service, err := youtube.New(client)
 	if err != nil {
 		return fmt.Errorf("could not create YouTube client: %v", err)
@@ -67,30 +60,6 @@ func UploadToYouTube(ctx context.Context, title, desc string, tags []string, pat
 	}
 
 	return nil
-}
-
-// authedClient performs an offline OAuth flow.
-func authedClient(ctx context.Context) (*http.Client, error) {
-	const path = "client_secrets.json"
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not open %s: %v", path, err)
-	}
-	cfg, err := google.ConfigFromJSON(b, youtube.YoutubeUploadScope)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse config: %v", err)
-	}
-
-	url := cfg.AuthCodeURL("")
-	fmt.Printf("Go here: \n\t%s\n", url)
-	fmt.Printf("Then enter the code: ")
-	var code string
-	fmt.Scanln(&code)
-	tok, err := cfg.Exchange(context.Background(), code)
-	if err != nil {
-		return nil, err
-	}
-	return cfg.Client(ctx, tok), nil
 }
 
 func progressBarReader(f *os.File) (io.Reader, error) {
