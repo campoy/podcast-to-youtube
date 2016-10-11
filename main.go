@@ -79,6 +79,9 @@ func main() {
 			fmt.Printf("episode %d: %s\n", e.Number, e.Title)
 		}
 	}
+	if len(selected) == 0 {
+		failf("no episodes selected\n")
+	}
 
 	fmt.Print("publish? (Y/n): ")
 	answer = ""
