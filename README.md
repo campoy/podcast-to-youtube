@@ -1,4 +1,4 @@
-# podcast2youtube
+# podcast-to-youtube
 
 The perfect tool to post any podcast episode to YouTube.
 Everything you need is:

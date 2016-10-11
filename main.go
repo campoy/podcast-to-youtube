@@ -11,7 +11,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Command podcast2youtube generate videos using ffmpeg from any given
+// Command podcast-to-youtube generates videos using ffmpeg from any given
 // podcast, by downloading the mp3 and adding a fixed image with a given logo
 // and text.
 package main
