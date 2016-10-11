@@ -22,6 +22,10 @@ directory containing this file as `client_secrets.json`.
 
 Simply run `make run` and you're done!
 
+See how it looks like in this [short screencast](https://www.youtube.com/watch?v=n8R_00NCCDQ):
+
+[![podcast to youtube screencast](https://img.youtube.com/vi/n8R_00NCCDQ/0.jpg)](https://www.youtube.com/watch?v=n8R_00NCCDQ)
+
 ## Disclaimer
 
 This is not an official Google product (experimental or otherwise), it is just
