@@ -32,16 +32,16 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
 	"golang.org/x/oauth2/google"
 
-	"google.golang.org/api/youtube/v3"
-
 	"github.com/campoy/podcast-to-youtube/image"
 	"github.com/campoy/tools/flags"
 	"github.com/microcosm-cc/bluemonday"
+	youtube "google.golang.org/api/youtube/v3"
 )
 
 var (
@@ -154,6 +154,8 @@ func fetchFeed(rss string) ([]episode, error) {
 			Tags:   i.Category,
 		})
 	}
+
+	sort.Slice(eps, func(i, j int) bool { return eps[i].Number < eps[j].Number })
 	return eps, nil
 }
 
