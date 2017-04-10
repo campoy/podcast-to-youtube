@@ -19,7 +19,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/xml"
 	"errors"
 	"flag"
 	"fmt"
@@ -32,7 +31,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -59,7 +57,7 @@ var (
 func main() {
 	flag.Parse()
 
-	eps, err := fetchFeed(*rssFeed)
+	eps, err := podcast.FetchFeed(*rssFeed)
 	if err != nil {
 		failf("%v\n", err)
 	}
@@ -72,7 +70,7 @@ func main() {
 		failf("%s is an invalid range\n", answer)
 	}
 
-	var selected []episode
+	var selected []podcast.Episode
 	for _, e := range eps {
 		if from <= e.Number && e.Number <= to {
 			selected = append(selected, e)
@@ -105,58 +103,6 @@ func main() {
 func failf(s string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, s, args...)
 	os.Exit(1)
-}
-
-type episode struct {
-	Title  string
-	Number int
-	Link   string
-	Desc   string
-	MP3    string
-	Tags   []string
-}
-
-func fetchFeed(rss string) ([]episode, error) {
-	res, err := http.Get(rss)
-	if err != nil {
-		return nil, fmt.Errorf("could not get %s: %v", rss, err)
-	}
-	defer res.Body.Close()
-
-	var data struct {
-		XMLName xml.Name `xml:"rss"`
-		Channel []struct {
-			Item []struct {
-				Title  string `xml:"title"`
-				Number int    `xml:"order"`
-				Link   string `xml:"guid"`
-				Desc   string `xml:"summary"`
-				MP3    struct {
-					URL string `xml:"url,attr"`
-				} `xml:"enclosure"`
-				Category []string `xml:"category"`
-			} `xml:"item"`
-		} `xml:"channel"`
-	}
-
-	if err := xml.NewDecoder(res.Body).Decode(&data); err != nil {
-		return nil, fmt.Errorf("could not decode feed: %v", err)
-	}
-
-	var eps []episode
-	for _, i := range data.Channel[0].Item {
-		eps = append(eps, episode{
-			Title:  i.Title,
-			Number: i.Number,
-			Link:   i.Link,
-			Desc:   i.Desc,
-			MP3:    i.MP3.URL,
-			Tags:   i.Category,
-		})
-	}
-
-	sort.Slice(eps, func(i, j int) bool { return eps[i].Number < eps[j].Number })
-	return eps, nil
 }
 
 // parseRange parses either a range (n-m) or a single episode number (n)
