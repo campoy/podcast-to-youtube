@@ -1,0 +1,140 @@
+{
+    "memo": "cd1178ea612699e202fdea8472880399b8d1bc216b67eda95bc5d7ce32038237",
+    "projects": [
+        {
+            "name": "cloud.google.com/go",
+            "branch": "master",
+            "revision": "bdd451d43030c0441b50809cf0aeffd941ec43ea",
+            "packages": [
+                "compute/metadata",
+                "internal"
+            ]
+        },
+        {
+            "name": "github.com/campoy/tools",
+            "branch": "interceptor",
+            "revision": "a96d03fe2fa3812add6dd0c52a9d313cf9d1ba17",
+            "packages": [
+                "flags"
+            ]
+        },
+        {
+            "name": "github.com/golang/freetype",
+            "branch": "master",
+            "revision": "c67e4d98d212356ec0d9436a1edcbb6eb799f847",
+            "packages": [
+                "raster",
+                "truetype"
+            ]
+        },
+        {
+            "name": "github.com/golang/protobuf",
+            "branch": "master",
+            "revision": "69b215d01a5606c843240eab4937eab3acee6530",
+            "packages": [
+                "proto"
+            ]
+        },
+        {
+            "name": "github.com/googleapis/gax-go",
+            "branch": "master",
+            "revision": "8c5154c0fe5bf18cf649634d4c6df50897a32751",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "github.com/microcosm-cc/bluemonday",
+            "branch": "master",
+            "revision": "e79763773ab6222ca1d5a7cbd9d62d83c1f77081",
+            "packages": [
+                "."
+            ]
+        },
+        {
+            "name": "golang.org/x/image",
+            "branch": "master",
+            "revision": "ed90ab82a880d9b63d5adecdc23c5cd5020addc1",
+            "packages": [
+                "font",
+                "math/fixed"
+            ]
+        },
+        {
+            "name": "golang.org/x/net",
+            "branch": "master",
+            "revision": "a6577fac2d73be281a500b310739095313165611",
+            "packages": [
+                "context",
+                "context/ctxhttp",
+                "html",
+                "html/atom",
+                "http2",
+                "http2/hpack",
+                "idna",
+                "internal/timeseries",
+                "lex/httplex",
+                "trace"
+            ]
+        },
+        {
+            "name": "golang.org/x/oauth2",
+            "branch": "master",
+            "revision": "1611bb46e67abc64a71ecc5c3ae67f1cbbc2b921",
+            "packages": [
+                ".",
+                "google",
+                "internal",
+                "jws",
+                "jwt"
+            ]
+        },
+        {
+            "name": "google.golang.org/api",
+            "branch": "master",
+            "revision": "1202890e803f07684581b575fda809bf335a533f",
+            "packages": [
+                "gensupport",
+                "googleapi",
+                "googleapi/internal/uritemplates",
+                "youtube/v3"
+            ]
+        },
+        {
+            "name": "google.golang.org/appengine",
+            "branch": "master",
+            "revision": "3a452f9e00122ead39586d68ffdb9c6e1326af3c",
+            "packages": [
+                ".",
+                "internal",
+                "internal/app_identity",
+                "internal/base",
+                "internal/datastore",
+                "internal/log",
+                "internal/modules",
+                "internal/remote_api",
+                "internal/urlfetch",
+                "urlfetch"
+            ]
+        },
+        {
+            "name": "google.golang.org/grpc",
+            "branch": "master",
+            "revision": "4eaacfed9779ee7568c9e72e9f763dbd3af8e0b4",
+            "packages": [
+                ".",
+                "codes",
+                "credentials",
+                "grpclog",
+                "internal",
+                "keepalive",
+                "metadata",
+                "naming",
+                "peer",
+                "stats",
+                "tap",
+                "transport"
+            ]
+        }
+    ]
+}
