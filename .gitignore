@@ -1,4 +1,6 @@
 **/.DS_Store
 .vscode/
-client_secrets.json
+client_secret.json
+**/secret.json
+token.json
 cmd

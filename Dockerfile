@@ -14,6 +14,7 @@
 FROM alpine
 RUN  apk add --update ca-certificates ffmpeg && rm -rf /var/cache/apk/*
 COPY resources resources
-COPY client_secrets.json .
-COPY ./cmd .
-ENTRYPOINT ["/cmd"]
+COPY client_secret.json .
+COPY token.json .
+COPY ./app .
+ENTRYPOINT ["/app"]

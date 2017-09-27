@@ -11,12 +11,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: build docker run
-build: cmd docker
-cmd: image/*.go *.go
-	GOOS=linux go build -i -o cmd
-docker:
+token.json:
+	go run cmd/auth/main.go
+build: token.json */*.go *.go
+	GOOS=linux go build -i -o app
 	docker build -t $(USER)/podcast-to-youtube .
+	rm -f app
 
 run: build
 	docker run --rm -it $(USER)/podcast-to-youtube
+
+.PHONY: build run

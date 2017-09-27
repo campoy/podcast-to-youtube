@@ -18,7 +18,6 @@ package main
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -27,19 +26,17 @@ import (
 	"image/png"
 	"io/ioutil"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"golang.org/x/oauth2/google"
-
 	"github.com/campoy/podcast-to-youtube/image"
+	"github.com/campoy/podcast-to-youtube/podcast"
+	"github.com/campoy/podcast-to-youtube/youtube"
 	"github.com/campoy/tools/flags"
 	"github.com/microcosm-cc/bluemonday"
-	youtube "google.golang.org/api/youtube/v3"
 )
 
 var (
@@ -52,48 +49,45 @@ var (
 	width      = flag.Int("w", 1280, "Width of the generated video in pixels")
 	height     = flag.Int("h", 720, "Height of the generated video in pixels")
 	tags       = flag.String("tags", "podcast,gcppodcast", "Comma separated list of tags to use in the YouTube upload")
+	playlistID = flag.String("playlist", "PLIivdWyY5sqJOTOszXDZh3XustjvTsrmQ", "playlist where the videos will be uploaded to")
 )
 
 func main() {
 	flag.Parse()
+
+	client, err := youtube.NewClient("client_secret.json", "token.json")
+	if err != nil {
+		failf("could not authenticate with YouTube: %v\n", err)
+	}
 
 	eps, err := podcast.FetchFeed(*rssFeed)
 	if err != nil {
 		failf("%v\n", err)
 	}
 
-	fmt.Print("episode number to publish (try 1, or 2-10): ")
-	var answer string
-	fmt.Scanln(&answer)
-	from, to, err := parseRange(answer)
+	last, err := client.FetchLastPublished(*playlistID)
 	if err != nil {
-		failf("%s is an invalid range\n", answer)
+		failf("%s", err)
 	}
 
-	var selected []podcast.Episode
-	for _, e := range eps {
-		if from <= e.Number && e.Number <= to {
-			selected = append(selected, e)
-			fmt.Printf("episode %d: %s\n", e.Number, e.Title)
+	for i := len(eps) - 1; i >= 0; i-- {
+		if strings.HasSuffix(last.Snippet.Title, fmt.Sprint(eps[i].Number)) {
+			eps = eps[i+1:]
+			break
 		}
 	}
-	if len(selected) == 0 {
-		failf("no episodes selected\n")
-	}
 
-	fmt.Print("publish? (Y/n): ")
-	answer = ""
-	fmt.Scanln(&answer)
-	if !(answer == "Y" || answer == "y" || answer == "") {
+	if len(eps) == 0 {
+		fmt.Println("everything up to date")
 		return
 	}
 
-	client, err := authedClient()
-	if err != nil {
-		failf("could not authenticate with YouTube: %v\n", err)
+	fmt.Println("about to publish:")
+	for _, ep := range eps {
+		fmt.Printf("#%d: %s\n", ep.Number, ep.Title)
 	}
 
-	for _, ep := range selected {
+	for _, ep := range eps {
 		if err := process(client, ep); err != nil {
 			failf("episode %d: %v\n", ep.Number, err)
 		}
@@ -124,34 +118,9 @@ func parseRange(s string) (first, last int, err error) {
 	}
 }
 
-// authedClient performs an offline OAuth flow.
-func authedClient() (*http.Client, error) {
-	const path = "client_secrets.json"
-	b, err := ioutil.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("could not open %s: %v", path, err)
-	}
-	cfg, err := google.ConfigFromJSON(b, youtube.YoutubeUploadScope)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse config: %v", err)
-	}
-
-	url := cfg.AuthCodeURL("")
-	fmt.Printf("Go here: \n\t%s\n", url)
-	fmt.Printf("Then enter the code: ")
-	var code string
-	fmt.Scanln(&code)
-	ctx := context.Background()
-	tok, err := cfg.Exchange(ctx, code)
-	if err != nil {
-		return nil, err
-	}
-	return cfg.Client(ctx, tok), nil
-}
-
 // process creates the video for the given episode and uploads it
 // to YouTube using an authenticated HTTP client.
-func process(client *http.Client, ep episode) error {
+func process(client *youtube.Client, ep podcast.Episode) error {
 	tmpDir, err := ioutil.TempDir("", "")
 	if err != nil {
 		return fmt.Errorf("could not create temp directory: %v", err)
@@ -193,20 +162,16 @@ func process(client *http.Client, ep episode) error {
 		return fmt.Errorf("could not create video title from template: %v", err)
 	}
 
+	title := buf.String()
+	tags := append(ep.Tags, strings.Split(*tags, ",")...)
+
 	// We drop all the HTML tags and line breaks from the description.
 	desc := bluemonday.StrictPolicy().Sanitize(ep.Desc)
 	desc = strings.Replace(desc, "\n", " ", -1)
-	data := &youtube.Video{
-		Snippet: &youtube.VideoSnippet{
-			Title:       buf.String(),
-			Description: fmt.Sprintf("Original post: %s\n\n", ep.Link) + desc,
-			Tags:        append(ep.Tags, strings.Split(*tags, ",")...),
-		},
-		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
-	}
+	desc = fmt.Sprintf("Original post: %s\n\n", ep.Link) + desc
 
 	// And finally we upload the video to YouTube.
-	if err := upload(client, data, vid); err != nil {
+	if err := client.Upload(title, desc, tags, vid); err != nil {
 		return fmt.Errorf("could not upload to YouTube: %v", err)
 	}
 	return nil
@@ -242,22 +207,4 @@ func ffmpeg(img, mp3, vid string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-// upload uploads the video in the given path to YouTube with the given details.
-func upload(client *http.Client, data *youtube.Video, path string) error {
-	service, err := youtube.New(client)
-	if err != nil {
-		return fmt.Errorf("could not create YouTube client: %v", err)
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("could not open %v: %v", path, err)
-	}
-	defer f.Close()
-
-	call := service.Videos.Insert("snippet,status", data)
-	_, err = call.Media(f).Do()
-	return err
 }
