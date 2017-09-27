@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"time"
 
 	"golang.org/x/oauth2/google"
 
@@ -54,10 +55,10 @@ func (client *Client) FetchLastPublished(playlistID string) (*youtube.PlaylistIt
 }
 
 // Upload uploads the video in the given path to YouTube with the given details.
-func (client *Client) Upload(title, desc string, tags []string, path string) error {
+func (client *Client) Upload(title, desc string, tags []string, path string) (string, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return fmt.Errorf("could not open %v: %v", path, err)
+		return "", fmt.Errorf("could not open %v: %v", path, err)
 	}
 	defer f.Close()
 
@@ -67,9 +68,61 @@ func (client *Client) Upload(title, desc string, tags []string, path string) err
 			Description: desc,
 			Tags:        tags,
 		},
-		Status: &youtube.VideoStatus{PrivacyStatus: "unlisted"},
+		Status: &youtube.VideoStatus{PrivacyStatus: "public"},
 	}
 	call := client.svc.Videos.Insert("snippet,status", video)
-	_, err = call.Media(f).Do()
+	video, err = call.Media(f).Do()
+	if err != nil {
+		return "", fmt.Errorf("could not insert video: %v", err)
+	}
+	return video.Id, nil
+}
+
+// AddToPlaylist adds the given video id to a plyalist.
+func (client *Client) AddToPlaylist(playlistID, videoID string) error {
+	call := client.svc.PlaylistItems.Insert("snippet", &youtube.PlaylistItem{
+		Snippet: &youtube.PlaylistItemSnippet{
+			PlaylistId: playlistID,
+			ResourceId: &youtube.ResourceId{
+				VideoId: videoID,
+				Kind:    "youtube#video",
+			},
+		},
+	})
+	_, err := call.Do()
 	return err
+}
+
+// IsProcessed returns whether a video has been successfully processed.
+func (client *Client) IsProcessed(videoID string) (bool, error) {
+	res, err := client.svc.Videos.List("status").Id(videoID).Do()
+	if err != nil {
+		return false, err
+	}
+	if len(res.Items) != 1 {
+		return false, fmt.Errorf("expected one item in response; got %d", len(res.Items))
+	}
+	return res.Items[0].Status.UploadStatus == "processed", nil
+}
+
+// WaitForProcessed blocks until the video is processed.
+func (client *Client) WaitForProcessed(videoID string, timeout time.Duration) error {
+	done := time.After(timeout)
+	ticker := time.NewTimer(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			ok, err := client.IsProcessed(videoID)
+			if err != nil {
+				return fmt.Errorf("could not check status")
+			}
+			if ok {
+				return nil
+			}
+		case <-done:
+			return fmt.Errorf("video not processed after 5 minutes")
+		}
+	}
 }

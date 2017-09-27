@@ -14,7 +14,7 @@
 token.json:
 	go run cmd/auth/main.go
 build: token.json */*.go *.go
-	GOOS=linux go build -i -o app
+	CGO_ENABLED=0 GOOS=linux go build -o app
 	docker build -t $(USER)/podcast-to-youtube .
 	rm -f app
 

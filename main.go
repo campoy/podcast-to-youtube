@@ -31,6 +31,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/campoy/podcast-to-youtube/image"
 	"github.com/campoy/podcast-to-youtube/podcast"
@@ -153,7 +154,7 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	// Then we create the video.
 	vid := filepath.Join(tmpDir, "vid.mp4")
 	if err := ffmpeg(slide, ep.MP3, vid); err != nil {
-		return fmt.Errorf("could not create video: %v\n", err)
+		return fmt.Errorf("could not create video: %v", err)
 	}
 
 	// We generate the metadata for the YouTube upload.
@@ -171,8 +172,18 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	desc = fmt.Sprintf("Original post: %s\n\n", ep.Link) + desc
 
 	// And finally we upload the video to YouTube.
-	if err := client.Upload(title, desc, tags, vid); err != nil {
+	videoID, err := client.Upload(title, desc, tags, vid)
+	if err != nil {
 		return fmt.Errorf("could not upload to YouTube: %v", err)
+	}
+
+	if err := client.WaitForProcessed(videoID, 5*time.Minute); err != nil {
+		return err
+	}
+
+	err = client.AddToPlaylist(*playlistID, videoID)
+	if err != nil {
+		return fmt.Errorf("could not insert into playlist: %v", err)
 	}
 	return nil
 }
