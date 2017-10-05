@@ -94,35 +94,35 @@ func (client *Client) AddToPlaylist(playlistID, videoID string) error {
 }
 
 // IsProcessed returns whether a video has been successfully processed.
-func (client *Client) IsProcessed(videoID string) (bool, error) {
+func (client *Client) Status(videoID string) (*youtube.VideoStatus, error) {
 	res, err := client.svc.Videos.List("status").Id(videoID).Do()
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	if len(res.Items) != 1 {
-		return false, fmt.Errorf("expected one item in response; got %d", len(res.Items))
+		return nil, fmt.Errorf("expected one item in response; got %d", len(res.Items))
 	}
-	return res.Items[0].Status.UploadStatus == "processed", nil
+	return res.Items[0].Status, nil
 }
 
 // WaitForProcessed blocks until the video is processed.
-func (client *Client) WaitForProcessed(videoID string, timeout time.Duration) error {
+func (client *Client) WaitForProcessed(videoID string, timeout time.Duration, log func(string, ...interface{})) error {
 	done := time.After(timeout)
-	ticker := time.NewTimer(10 * time.Second)
+	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			ok, err := client.IsProcessed(videoID)
+			s, err := client.Status(videoID)
 			if err != nil {
 				return fmt.Errorf("could not check status")
 			}
-			if ok {
+			if s.UploadStatus == "processed" {
 				return nil
 			}
 		case <-done:
-			return fmt.Errorf("video not processed after 5 minutes")
+			return fmt.Errorf("video not processed after %v", timeout)
 		}
 	}
 }

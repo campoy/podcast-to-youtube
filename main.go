@@ -132,6 +132,8 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 		}
 	}()
 
+	log.Printf("creating background image")
+
 	img, err := image.Generate(image.Params{
 		Logo:       *logo,
 		Text:       fmt.Sprintf("%d: %s", ep.Number, ep.Title),
@@ -145,11 +147,15 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 		return fmt.Errorf("could not generate image: %v", err)
 	}
 
+	log.Printf("background image created")
+
 	// We create the image and store it in the temp directory.
 	slide := filepath.Join(tmpDir, "slide.png")
 	if err := writePNG(slide, img); err != nil {
 		return fmt.Errorf("could not create image: %v", err)
 	}
+
+	log.Printf("rendering video")
 
 	// Then we create the video.
 	vid := filepath.Join(tmpDir, "vid.mp4")
@@ -171,15 +177,21 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	desc = strings.Replace(desc, "\n", " ", -1)
 	desc = fmt.Sprintf("Original post: %s\n\n", ep.Link) + desc
 
+	log.Printf("uploading video")
+
 	// And finally we upload the video to YouTube.
 	videoID, err := client.Upload(title, desc, tags, vid)
 	if err != nil {
 		return fmt.Errorf("could not upload to YouTube: %v", err)
 	}
 
-	if err := client.WaitForProcessed(videoID, 5*time.Minute); err != nil {
+	log.Printf("video uploaded; waiting to be processed")
+
+	if err := client.WaitForProcessed(videoID, 10*time.Minute, log.Printf); err != nil {
 		return err
 	}
+
+	log.Printf("video processed; now adding it to the playlist")
 
 	err = client.AddToPlaylist(*playlistID, videoID)
 	if err != nil {
