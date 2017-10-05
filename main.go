@@ -18,6 +18,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -50,13 +51,13 @@ var (
 	width      = flag.Int("w", 1280, "Width of the generated video in pixels")
 	height     = flag.Int("h", 720, "Height of the generated video in pixels")
 	tags       = flag.String("tags", "podcast,gcppodcast", "Comma separated list of tags to use in the YouTube upload")
-	playlistID = flag.String("playlist", "PLIivdWyY5sqJOTOszXDZh3XustjvTsrmQ", "playlist where the videos will be uploaded to")
+	playlist   = flag.String("playlist", "PLIivdWyY5sqJOTOszXDZh3XustjvTsrmQ", "playlist where the videos will be uploaded to")
 )
 
 func main() {
 	flag.Parse()
 
-	client, err := youtube.NewClient("client_secret.json", "token.json")
+	client, err := youtube.NewClient("client_secret.json", "token.json", log.Printf)
 	if err != nil {
 		failf("could not authenticate with YouTube: %v\n", err)
 	}
@@ -66,7 +67,7 @@ func main() {
 		failf("%v\n", err)
 	}
 
-	last, err := client.FetchLastPublished(*playlistID)
+	last, err := client.FetchLastPublished(*playlist)
 	if err != nil {
 		failf("%s", err)
 	}
@@ -122,13 +123,13 @@ func parseRange(s string) (first, last int, err error) {
 // process creates the video for the given episode and uploads it
 // to YouTube using an authenticated HTTP client.
 func process(client *youtube.Client, ep podcast.Episode) error {
-	tmpDir, err := ioutil.TempDir("", "")
+	tmp, err := ioutil.TempDir("", "")
 	if err != nil {
 		return fmt.Errorf("could not create temp directory: %v", err)
 	}
 	defer func() {
-		if err := os.RemoveAll(tmpDir); err != nil {
-			log.Printf("could not remove %s: %v", tmpDir, err)
+		if err := os.RemoveAll(tmp); err != nil {
+			log.Printf("could not remove %s: %v", tmp, err)
 		}
 	}()
 
@@ -150,7 +151,7 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	log.Printf("background image created")
 
 	// We create the image and store it in the temp directory.
-	slide := filepath.Join(tmpDir, "slide.png")
+	slide := filepath.Join(tmp, "slide.png")
 	if err := writePNG(slide, img); err != nil {
 		return fmt.Errorf("could not create image: %v", err)
 	}
@@ -158,7 +159,7 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	log.Printf("rendering video")
 
 	// Then we create the video.
-	vid := filepath.Join(tmpDir, "vid.mp4")
+	vid := filepath.Join(tmp, "vid.mp4")
 	if err := ffmpeg(slide, ep.MP3, vid); err != nil {
 		return fmt.Errorf("could not create video: %v", err)
 	}
@@ -180,20 +181,23 @@ func process(client *youtube.Client, ep podcast.Episode) error {
 	log.Printf("uploading video")
 
 	// And finally we upload the video to YouTube.
-	videoID, err := client.Upload(title, desc, tags, vid)
+	video, err := client.Upload(title, desc, tags, vid)
 	if err != nil {
 		return fmt.Errorf("could not upload to YouTube: %v", err)
 	}
 
 	log.Printf("video uploaded; waiting to be processed")
 
-	if err := client.WaitForProcessed(videoID, 10*time.Minute, log.Printf); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := client.WaitUntilProcessed(ctx, video); err != nil {
 		return err
 	}
 
 	log.Printf("video processed; now adding it to the playlist")
 
-	err = client.AddToPlaylist(*playlistID, videoID)
+	err = client.AddToPlaylist(*playlist, video)
 	if err != nil {
 		return fmt.Errorf("could not insert into playlist: %v", err)
 	}
